@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse, base64, csv, json, sys, time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
