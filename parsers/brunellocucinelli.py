@@ -4,6 +4,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 API = "https://ydsnap3m.api.commercecloud.salesforce.com/search/shopper-search/v1/organizations/f_ecom_abcp_prd/product-search"
+# E and K are full-body model shots; the other view codes are crops or product-only.
+LOOK_VIEWS = {"E", "K"}
 FIELDS = [
     "image_url", "product_id", "represented_product_id", "source",
     "image_view_type", "product_name", "description", "details", "price",
@@ -37,7 +39,7 @@ def fetch(offset, limit, token, retries=3):
                 raise
         time.sleep(2 ** attempt)
 
-def rows(hit, views):
+def rows(hit):
     analytics = hit.get("c_analytics") or {}
     category = analytics.get("categoryPath", "")
     if "/ready_to_wear/" not in category:
@@ -46,7 +48,7 @@ def rows(hit, views):
     color = analytics.get("color") or {}
     represented = hit.get("representedProduct") or {}
     for image in (hit.get("c_images") or {}).get("large") or []:
-        if image.get("imageViewType") not in views:
+        if image.get("imageViewType") not in LOOK_VIEWS:
             continue
         yield {
             "image_url": image.get("link") or image.get("url", ""),
@@ -68,22 +70,20 @@ def rows(hit, views):
 
 def main():
     parser = argparse.ArgumentParser(description="Export Brunello Cucinelli look images")
-    parser.add_argument("--limit", type=int, default=100)
-    parser.add_argument("--views", default="E,K", help="comma-separated image view types")
     parser.add_argument("--token", required=True, help="Storefront API bearer token")
     args = parser.parse_args()
     if json.loads(base64.urlsafe_b64decode(args.token.split(".")[1] + "==")).get("exp", 0) <= time.time():
         raise URLError("bearer token has expired")
-    views, offset, products, images = set(args.views.split(",")), 0, 0, 0
+    offset, products, images = 0, 0, 0
     with open("brunellocucinelli.csv", "w", newline="", encoding="utf-8") as output:
         writer = csv.DictWriter(output, fieldnames=FIELDS)
         writer.writeheader()
         while True:
-            page = fetch(offset, args.limit, args.token)
+            page = fetch(offset, 100, args.token)
             hits = page.get("hits") or []
             for hit in hits:
                 products += 1
-                for row in rows(hit, views):
+                for row in rows(hit):
                     writer.writerow(row)
                     images += 1
             offset += len(hits)
