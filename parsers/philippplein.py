@@ -3,6 +3,7 @@ from http.cookiejar import CookieJar
 from html.parser import HTMLParser
 from urllib.parse import urljoin
 from urllib.request import build_opener, HTTPCookieProcessor, Request
+from schema import CSV_COLUMNS, format_gender, format_price
 
 
 API = (
@@ -17,10 +18,6 @@ HEADERS = {
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
     "X-Requested-With": "XMLHttpRequest",
 }
-COLUMNS = [
-    "image_url", "product_id", "source", "product_name", "price", "currency",
-    "category", "gender", "color", "product_url",
-]
 
 
 class ProductPage(HTMLParser):
@@ -47,7 +44,7 @@ class ProductPage(HTMLParser):
             self.product.update({
                 "product_id": attrs["data-id"],
                 "product_name": attrs["data-name"],
-                "price": attrs["data-price"],
+                "price": format_price(attrs["data-price"]),
                 "currency": attrs["data-currency"],
                 "category": attrs["data-category"],
                 "color": attrs["data-variant"],
@@ -66,7 +63,7 @@ class ProductPage(HTMLParser):
         self.depth -= 1
         if self.depth == 0:
             if "image_url" in self.product:
-                self.product.update(source="philippplein", gender="man")
+                self.product.update(source="philippplein", gender=format_gender("man"))
                 self.products.append(self.product)
             self.product = None
 
@@ -84,7 +81,7 @@ def main():
         url = page.next_url
 
     with open(OUTPUT, "w", newline="", encoding="utf-8") as output:
-        writer = csv.DictWriter(output, fieldnames=COLUMNS)
+        writer = csv.DictWriter(output, fieldnames=CSV_COLUMNS)
         writer.writeheader()
         writer.writerows(rows.values())
     print(f"Wrote {len(rows)} images to {OUTPUT}")

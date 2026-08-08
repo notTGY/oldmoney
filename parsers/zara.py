@@ -2,6 +2,7 @@ import csv
 import json
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from schema import CSV_COLUMNS, format_gender, format_price
 
 
 CATALOG_API = "https://www.zara.com/us/en/category/2443335/products?ajax=true"
@@ -12,10 +13,6 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
 }
-COLUMNS = [
-    "image_url", "product_id", "source", "product_name", "price", "currency",
-    "category", "gender", "color", "description", "materials", "product_url",
-]
 
 
 def fetch(url):
@@ -74,10 +71,10 @@ def looks(product):
                 "product_id": product_id,
                 "source": "zara",
                 "product_name": product.get("name", ""),
-                "price": color.get("price", 0) / 100,
+                "price": format_price(color.get("price", 0) / 100),
                 "currency": "USD",
                 "category": category,
-                "gender": product.get("sectionName", "").lower(),
+                "gender": format_gender(product.get("sectionName", "")),
                 "color": color.get("name", ""),
                 "description": product.get("description", ""),
                 "materials": composition,
@@ -88,7 +85,7 @@ def looks(product):
 def main():
     rows = {row["image_url"]: row for product in products() for row in looks(product)}
     with open(OUTPUT, "w", newline="", encoding="utf-8") as output:
-        writer = csv.DictWriter(output, fieldnames=COLUMNS)
+        writer = csv.DictWriter(output, fieldnames=CSV_COLUMNS)
         writer.writeheader()
         writer.writerows(rows.values())
     print(f"Wrote {len(rows)} images to {OUTPUT}")

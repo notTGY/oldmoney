@@ -5,6 +5,7 @@ import sys
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from schema import CSV_COLUMNS, format_gender, format_price
 
 
 API = (
@@ -13,19 +14,6 @@ API = (
 )
 OUTPUT = "brunellocucinelli.csv"
 LOOK_VIEWS = {"E", "K"}  # Full-body model shots; other views are crops or product-only.
-COLUMNS = [
-    "image_url",
-    "product_id",
-    "source",
-    "product_name",
-    "price",
-    "currency",
-    "category",
-    "gender",
-    "color",
-    "description",
-    "product_url",
-]
 
 
 def products(token):
@@ -70,10 +58,10 @@ def looks(product):
                 "product_id": product["productId"],
                 "source": "brunellocucinelli",
                 "product_name": product.get("productName", ""),
-                "price": (price.get("price") or {}).get("value", ""),
+                "price": format_price((price.get("price") or {}).get("value")),
                 "currency": price.get("currency", ""),
                 "category": category,
-                "gender": analytics.get("gender", ""),
+                "gender": format_gender(analytics.get("gender", "")),
                 "color": color.get("label", ""),
                 "description": product.get("c_ariaLabel", ""),
                 "product_url": product.get("c_productUrl", ""),
@@ -87,7 +75,7 @@ def main():
 
     rows = [row for product in products(token) for row in looks(product)]
     with open(OUTPUT, "w", newline="", encoding="utf-8") as output:
-        writer = csv.DictWriter(output, fieldnames=COLUMNS)
+        writer = csv.DictWriter(output, fieldnames=CSV_COLUMNS)
         writer.writeheader()
         writer.writerows(rows)
     print(f"Wrote {len(rows)} images to {OUTPUT}")

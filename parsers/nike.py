@@ -1,6 +1,7 @@
 import csv, html, json, re, time
 from urllib.parse import urlencode, urljoin
 from urllib.request import Request, urlopen
+from schema import CSV_COLUMNS, format_gender, format_price
 
 
 API = "https://api.nike.com"
@@ -19,7 +20,6 @@ HEADERS = {
     "Referer": "https://www.nike.com/",
     "User-Agent": "Mozilla/5.0",
 }
-COLUMNS = ["image_url", "product_id", "source", "product_name", "price", "currency", "category", "gender", "color", "description", "materials", "product_url"]
 
 def fetch(url, retries=6):
     try:
@@ -76,10 +76,10 @@ def looks(thread):
                 "product_id": product["styleColor"],
                 "source": "nike",
                 "product_name": content.get("fullTitle", ""),
-                "price": price.get("currentPrice", ""),
+                "price": format_price(price.get("currentPrice")),
                 "currency": price.get("currency", ""),
                 "category": category,
-                "gender": ", ".join(product.get("genders", [])).lower(),
+                "gender": format_gender(product.get("genders", [])),
                 "color": content.get("colorDescription", ""),
                 "description": clean_description(description),
                 "materials": materials,
@@ -90,7 +90,7 @@ def looks(thread):
 def main():
     rows = {row["image_url"]: row for item in product_feed(style_codes()) for row in looks(item)}
     with open(OUTPUT, "w", newline="", encoding="utf-8") as output:
-        writer = csv.DictWriter(output, fieldnames=COLUMNS)
+        writer = csv.DictWriter(output, fieldnames=CSV_COLUMNS)
         writer.writeheader()
         writer.writerows(rows.values())
     print(f"Wrote {len(rows)} images to {OUTPUT}")
