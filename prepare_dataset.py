@@ -1,9 +1,10 @@
 import csv
 import hashlib
+import os
 from collections import defaultdict
 from pathlib import Path
 
-
+from huggingface_hub import CommitOperationAdd, HfApi
 ROOT = Path(__file__).resolve().parent
 SOURCES = (
     "nike.csv",
@@ -14,12 +15,10 @@ SOURCES = (
 LABELS = "labels.csv"
 REQUIRED_COLUMNS = {"image_url", "product_id", "source"}
 
-
 def read_csv(path, **kwargs):
     with path.open(encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file, **kwargs)
         return reader.fieldnames, list(reader)
-
 
 def take_groups(groups, available, target):
     selected = []
@@ -35,12 +34,12 @@ def take_groups(groups, available, target):
     available[:] = [key for key in available if key not in chosen]
     return selected
 
-
 def main():
     required = [ROOT / name for name in (*SOURCES, LABELS)]
     missing = [path.name for path in required if not path.is_file()]
     if missing:
         raise FileNotFoundError(f"missing required files: {', '.join(missing)}")
+    token = os.environ["HF_TOKEN"]
 
     rows = []
     columns = None
@@ -80,14 +79,22 @@ def main():
     val = take_groups(groups, order, 500)
     splits = {"test": test, "val": val, "train": order}
     fields = ["id", "label", *columns]
+    outputs = []
     for split, keys in splits.items():
         split_rows = [row for key in keys for row in groups[key]]
-        with (ROOT / f"dataset_{split}.csv").open("w", encoding="utf-8", newline="") as file:
+        output = ROOT / f"dataset_{split}.csv"
+        with output.open("w", encoding="utf-8", newline="") as file:
             writer = csv.DictWriter(file, fieldnames=fields)
             writer.writeheader()
             writer.writerows(split_rows)
+        outputs.append(output)
         print(f"{split}: {len(split_rows)} images")
 
-
+    api = HfApi(token=token)
+    repo_id = f"{api.whoami()['name']}/oldmoney"
+    api.create_repo(repo_id, repo_type="dataset", private=True, exist_ok=True)
+    operations = [CommitOperationAdd(path_in_repo=path.name, path_or_fileobj=path) for path in outputs]
+    api.create_commit(repo_id, repo_type="dataset", operations=operations, commit_message="Upload prepared dataset")
+    print(f"uploaded splits to {repo_id}")
 if __name__ == "__main__":
     main()
